@@ -1,0 +1,101 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>ESP8266 4-Relay Control</title>
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<link href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.0/css/all.min.css" rel="stylesheet">
+<style>
+    :root { --primary:#007bff; --success:#28a745; --danger:#dc3545; }
+    body {font-family:Arial,Helvetica,sans-serif;background:#f5f5f5;margin:0;padding:0;}
+    .container {max-width:420px;margin:30px auto;background:#fff;padding:20px;border-radius:8px;box-shadow:0 2px 12px rgba(0,0,0,.1);}
+    h1 {text-align:center;margin-bottom:20px;font-size:1.5rem;}
+    .input-row {display:flex;gap:8px;margin-bottom:12px;flex-wrap:wrap;}
+    input, button {padding:10px;font-size:1rem;border-radius:4px;border:1px solid #ced4da;}
+    input {flex:1;min-width:120px;}
+    button {background:var(--primary);color:#fff;border:none;cursor:pointer;}
+    button:hover {background:#0056b3;}
+    button:disabled {background:#6c757d;cursor:not-allowed;}
+    .status {padding:10px;margin:12px 0;border-radius:4px;text-align:center;font-weight:bold;}
+    .connected {background:#d4edda;color:#155724;}
+    .disconnected {background:#f8d7da;color:#721c24;}
+    .relay {display:flex;align-items:center;justify-content:space-between;margin:12px 0;padding:10px;background:#e9ecef;border-radius:4px;}
+    .relay label {flex:1;font-weight:bold;}
+    .relay button {width:48px;height:38px;border:none;border-radius:4px;color:#fff;font-weight:bold;}
+    .on  {background:var(--success);}
+    .off {background:var(--danger);}
+    @media (max-width:480px) {.input-row{flex-direction:column;}}
+</style>
+</head>
+<body>
+<div class="container">
+    <h1><i class="fas fa-plug"></i> ESP8266 4-Relay</h1>
+
+    <div class="input-row">
+        <input type="text" id="espIp" placeholder="ESP IP (e.g. 192.168.4.1)" value="192.168.4.1">
+        <button id="connectBtn" onclick="toggleConnect()">Connect</button>
+    </div>
+
+    <div id="status" class="status disconnected">Disconnected</div>
+
+    <div class="relay">
+        <label>Relay 1</label>
+        <button class="off" onclick="send(1,false)">OFF</button>
+        <button class="on"  onclick="send(1,true)">ON</button>
+    </div>
+    <div class="relay">
+        <label>Relay 2</label>
+        <button class="off" onclick="send(2,false)">OFF</button>
+        <button class="on"  onclick="send(2,true)">ON</button>
+    </div>
+    <div class="relay">
+        <label>Relay 3</label>
+        <button class="off" onclick="send(3,false)">OFF</button>
+        <button class="on"  onclick="send(3,true)">ON</button>
+    </div>
+    <div class="relay">
+        <label>Relay 4</label>
+        <button class="off" onclick="send(4,false)">OFF</button>
+        <button class="on"  onclick="send(4,true)">ON</button>
+    </div>
+
+    <p style="font-size:0.8rem;text-align:center;color:#666;">
+        Uses WebSocket → TCP bridge (localhost:8765). <br>
+        PowerShell launches everything automatically.
+    </p>
+</div>
+
+<script>
+let ws = null;
+const statusEl = document.getElementById('status');
+const connectBtn = document.getElementById('connectBtn');
+
+function setStatus(txt, connected) {
+    statusEl.textContent = txt;
+    statusEl.className = 'status ' + (connected?'connected':'disconnected');
+    document.querySelectorAll('.relay button').forEach(b=>b.disabled=!connected);
+    connectBtn.textContent = connected ? 'Disconnect' : 'Connect';
+}
+
+function toggleConnect() {
+    if (ws) { ws.close(); return; }
+    const ip = document.getElementById('espIp').value.trim();
+    if (!ip) return alert('Enter ESP IP');
+    // We talk to the *local* Python bridge, not directly to the ESP
+    ws = new WebSocket('ws://127.0.0.1:8765');
+    ws.binaryType = 'arraybuffer';
+
+    ws.onopen = () => setStatus(`Connected – forwarding to ${ip}`, true);
+    ws.onclose = () => { ws=null; setStatus('Disconnected', false); };
+    ws.onerror = () => setStatus('WebSocket error', false);
+}
+
+function send(relay, on) {
+    if (!ws || ws.readyState !== WebSocket.OPEN) return alert('Connect first');
+    const payload = JSON.stringify({relay, on});
+    ws.send(payload);  // ← This is correct
+    console.log("Sent JSON:", payload);
+}
+</script>
+</body>
+</html>
